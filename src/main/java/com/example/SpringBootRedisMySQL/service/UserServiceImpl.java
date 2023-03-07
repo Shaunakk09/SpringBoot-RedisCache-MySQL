@@ -34,14 +34,14 @@ public class UserServiceImpl implements UserService{
     }
 
     @Override
-    public User fetchUserById(Long mid) {
+    public User fetchUserById(Integer mid) {
         User user;
         user = (User) redisTemplate.opsForHash().get(KEY,mid.toString());
         return user;
     }
 
     @Override
-    public boolean deleteUser(Long mid) {
+    public boolean deleteUser(Integer mid) {
         try{
             redisTemplate.opsForHash().delete(KEY,mid.toString());
             return true;

@@ -1,9 +1,9 @@
 package com.example.SpringBootRedisMySQL.controller;
 
+import com.example.SpringBootRedisMySQL.DAO.UserDAO;
 import com.example.SpringBootRedisMySQL.SpringBootRedisMySqlApplication;
 import com.example.SpringBootRedisMySQL.model.User;
 import com.example.SpringBootRedisMySQL.service.UserService;
-import lombok.extern.slf4j.Slf4j;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -15,17 +15,20 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Optional;
 
 @RestController
 public class UserController {
-
     private static final Logger log = LoggerFactory.getLogger(SpringBootRedisMySqlApplication.class);
     @Autowired
     private UserService userService;
+    @Autowired
+    private UserDAO userDAO;
     @PostMapping("/user")
     public ResponseEntity<String> saveUser(@RequestBody User user){
         String firstName = user.getFirstName();
         boolean result = userService.saveUser(user);
+        userDAO.save(user);
         if(result) {
             log.info("User created successfully -> " + firstName);
             return ResponseEntity.ok("User created successfully");
@@ -39,28 +42,30 @@ public class UserController {
         users = userService.fetchAllUser();
         for(User user:users){
             String firstName = user.getFirstName();
-            Long mid = user.getMid();
+            Integer mid = user.getMid();
             log.info("User "+mid.toString()+" -> "+firstName);
         }
         ResponseEntity.ok(users);
-        return users;
+        return (List<User>) userDAO.findAll();
     }
 
     @GetMapping("/user/{mid}")
     @Cacheable(value = "user",key = "#mid")
-    public User fetchUserbyId(@PathVariable(value = "mid") Long mid){
+    public Optional<User> fetchUserbyId(@PathVariable(value = "mid") Integer mid){
         User user;
         user = userService.fetchUserById(mid);
         String firstName = user.getFirstName();
         log.info("User "+mid+" -> "+firstName);
         ResponseEntity.ok(user);
-        return userService.fetchUserById(mid);
+        return userDAO.findById(mid);
     }
+
     @DeleteMapping("/user/{mid}")
     @CacheEvict(value = "user",key = "#mid")
-    public ResponseEntity<String> deleteUser(@PathVariable("mid") Long mid){
+    public ResponseEntity<String> deleteUser(@PathVariable("mid") Integer mid){
         User user = userService.fetchUserById(mid);
         String firstName = user.getFirstName();
+        userDAO.deleteById(mid);
         boolean result = userService.deleteUser(mid);
         if(result) {
             log.info("User "+mid.toString()+" Deleted -> "+firstName);
@@ -72,16 +77,17 @@ public class UserController {
     @PutMapping("/user")
     @CachePut(value = "user",key = "#user.getMid()")
     public User updateUser(@RequestBody User user){
-        User oldUser = fetchUserbyId(user.getMid());
-        if(oldUser != null){
-            String oldUserName = oldUser.getFirstName();
-            deleteUser(oldUser.getMid());
-            saveUser(user);
-            ResponseEntity.ok(user);
-            log.info("Old user "+oldUserName+" Deleted. New user "+user.getFirstName());
-            return user;
-        }
+//        if(userDAO.existsById((Integer) user.getMid())){
+//            User oldUser = userService.fetchUserById(user.getMid());
+//            String oldUserName = oldUser.getFirstName();
+//            userDAO.deleteById(oldUser.getMid());
+//            deleteUser(oldUser.getMid());
+//            saveUser(user);
+//            ResponseEntity.ok(user);
+//            log.info("Old user "+oldUserName+" Deleted. New user "+user.getFirstName());
+//            return userDAO.save(user);
+//        }
         saveUser(user);
-        return user;
+        return userDAO.save(user);
     }
 }

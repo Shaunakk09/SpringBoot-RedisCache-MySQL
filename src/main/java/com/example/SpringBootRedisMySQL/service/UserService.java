@@ -9,7 +9,7 @@ public interface UserService {
 
     List<User> fetchAllUser();
 
-    User fetchUserById(Long mid);
+    User fetchUserById(Integer mid);
 
-    boolean deleteUser(Long mid);
+    boolean deleteUser(Integer mid);
 }
