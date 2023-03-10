@@ -54,9 +54,9 @@ public class UserServiceImpl implements UserService{
         String lastName = node.get("lastName").asText();
         Integer age = node.get("age").asInt();
         Boolean blacklisted = node.get("blacklisted").asBoolean();
-        long now = System.currentTimeMillis();
+        String date = node.get("date_time").asText();
         Integer counter = node.get("counter").asInt()+1;
-        Optional<User> UpdatedUser = Optional.of(new User(Mid, firstName, lastName, age, blacklisted, Long.toString(now), counter));
+        Optional<User> UpdatedUser = Optional.of(new User(Mid, firstName, lastName, age, blacklisted, date, counter));
         return UpdatedUser;
     }
 

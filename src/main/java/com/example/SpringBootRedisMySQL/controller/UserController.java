@@ -88,12 +88,21 @@ public class UserController {
             if(userService.UserExistInCache(mid)){
                 log.info("Bad user already exists. Incrementing count");
                 Optional<User> UpdatedUser = userService.incrementBadUserCount(mid);
-                if(UpdatedUser.get().getCounter() <= 5){
+                long start = Long.parseLong(UpdatedUser.get().getDate_time());
+                long end = System.currentTimeMillis();
+                if(UpdatedUser.get().getCounter() < 5){
                     return UpdatedUser;
                 }
-                else{
+                else if(UpdatedUser.get().getCounter() == 5 && (end - start) < 60*1000){   //5 requests in less than 1 minute
+                    log.info("5 requests for MID in less than 1 minute");
                     long now = System.currentTimeMillis();
                     Optional<User> badUser = Optional.of(new User(mid,"null","null",0,true,Long.toString(now),5));
+                    return badUser;
+                }
+                else if(UpdatedUser.get().getCounter() >= 5 && (end - start) > 60*1000){
+                    log.info("5 requests in more than 1 minute so counter reset to 1");
+                    long now = System.currentTimeMillis();
+                    Optional<User> badUser = Optional.of(new User(mid,"null","null",0,false,Long.toString(now),1));
                     return badUser;
                 }
             }
