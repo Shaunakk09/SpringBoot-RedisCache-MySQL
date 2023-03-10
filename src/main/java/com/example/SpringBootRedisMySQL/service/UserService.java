@@ -1,15 +1,23 @@
 package com.example.SpringBootRedisMySQL.service;
 
 import com.example.SpringBootRedisMySQL.model.User;
+import com.fasterxml.jackson.core.JsonProcessingException;
 
-import java.util.List;
+import java.util.Optional;
 
 public interface UserService {
-    boolean saveUser(User user);
 
-    List<User> fetchAllUser();
+    boolean UserExistInCache(Integer mid);
 
-    User fetchUserById(Integer mid);
+    Optional<User> incrementBadUserCount(Integer mid) throws JsonProcessingException;
 
-    boolean deleteUser(Integer mid);
+    Optional<User> fetchUserFromCache(Integer mid) throws JsonProcessingException;
+
+    void deleteUserFromCache(Integer mid);
+
+    boolean BlockedUserInCache(Integer mid) throws JsonProcessingException;
+
+    boolean UserWaitToUnblock(Integer mid) throws JsonProcessingException;
+
+    boolean UserCountZeroCheck(Integer mid) throws JsonProcessingException;
 }

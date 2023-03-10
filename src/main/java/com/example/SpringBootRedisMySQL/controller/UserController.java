@@ -4,12 +4,12 @@ import com.example.SpringBootRedisMySQL.DAO.UserDAO;
 import com.example.SpringBootRedisMySQL.SpringBootRedisMySqlApplication;
 import com.example.SpringBootRedisMySQL.model.User;
 import com.example.SpringBootRedisMySQL.service.UserService;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.CachePut;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -24,52 +24,98 @@ public class UserController {
     private UserService userService;
     @Autowired
     private UserDAO userDAO;
+
     @PostMapping("/user")
     public ResponseEntity<String> saveUser(@RequestBody User user){
-        String firstName = user.getFirstName();
-        boolean result = userService.saveUser(user);
-        userDAO.save(user);
-        if(result) {
-            log.info("User created successfully -> " + firstName);
+        long now = System.currentTimeMillis();
+        user.setDate_time(Long.toString(now));
+        User user1 = userDAO.save(user);
+        if(userService.UserExistInCache(user.getMid())){
+            userService.deleteUserFromCache(user.getMid());
+        }
+        if(user1 != null) {
+            log.info("User created successfully -> " + user1.getFirstName());
             return ResponseEntity.ok("User created successfully");
         }
         else  return  ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
     }
 
     @GetMapping("/user")
-    public List<User> fetchAllUser() {
-        List<User> users;
-        users = userService.fetchAllUser();
+    public List<User> fetchAllUser(){
+        List<User> users = (List<User>) userDAO.findAll();
         for(User user:users){
             String firstName = user.getFirstName();
             Integer mid = user.getMid();
             log.info("User "+mid.toString()+" -> "+firstName);
         }
         ResponseEntity.ok(users);
-        return (List<User>) userDAO.findAll();
+        return users;
     }
 
     @GetMapping("/user/{mid}")
-    @Cacheable(value = "user",key = "#mid")
-    public Optional<User> fetchUserbyId(@PathVariable(value = "mid") Integer mid){
-        User user;
-        user = userService.fetchUserById(mid);
-        String firstName = user.getFirstName();
-        log.info("User "+mid+" -> "+firstName);
-        ResponseEntity.ok(user);
+    @CachePut(value = "user",key = "#mid", unless="#result == null")
+    public Optional<User> fetchUserbyId(@PathVariable(value = "mid") Integer mid) throws JsonProcessingException {
+
+        if(userService.UserExistInCache(mid) && userService.UserCountZeroCheck(mid)){
+            log.info("User exists in cache.");
+            Optional<User> UpdatedUser = userService.fetchUserFromCache(mid);
+            return  UpdatedUser;
+        }
+
+        if(userService.UserExistInCache(mid)){
+            if(userService.BlockedUserInCache(mid)){
+                log.info("User blocked!!!!!!!");
+                if(userService.UserWaitToUnblock(mid)){
+                    long now = System.currentTimeMillis();
+                    Optional<User> blockedUser = Optional.of(new User(mid,"null","null",0,false,Long.toString(now),1));
+                    log.info("User unblocked!!!!!!!");          //user is unblocked after 2 minutes of being blocked
+                    return blockedUser;
+                }
+                else{
+                    return userService.fetchUserFromCache(mid);
+                }
+            }
+        }
+
+        if(userDAO.existsById(mid)){
+            Optional<User> user = userDAO.findById(mid);
+            String firstName = user.get().getFirstName();
+            log.info("User "+mid+" -> "+firstName);
+            ResponseEntity.ok(user);
+        }
+        else{
+            log.info("User not found in the DataBase.");
+            if(userService.UserExistInCache(mid)){
+                log.info("Bad user already exists. Incrementing count");
+                Optional<User> UpdatedUser = userService.incrementBadUserCount(mid);
+                if(UpdatedUser.get().getCounter() <= 5){
+                    return UpdatedUser;
+                }
+                else{
+                    long now = System.currentTimeMillis();
+                    Optional<User> badUser = Optional.of(new User(mid,"null","null",0,true,Long.toString(now),5));
+                    return badUser;
+                }
+            }
+            else{
+                log.info("................... NEW BAD USER ............");
+                long now = System.currentTimeMillis();
+                Optional<User> badUser = Optional.of(new User(mid,"null","null",0,false,Long.toString(now),1));
+                return badUser;
+            }
+        }
         return userDAO.findById(mid);
     }
 
     @DeleteMapping("/user/{mid}")
     @CacheEvict(value = "user",key = "#mid")
     public ResponseEntity<String> deleteUser(@PathVariable("mid") Integer mid){
-        User user = userService.fetchUserById(mid);
-        String firstName = user.getFirstName();
-        userDAO.deleteById(mid);
-        boolean result = userService.deleteUser(mid);
-        if(result) {
+        if(userDAO.existsById(mid)) {
+            Optional<User> user = userDAO.findById(mid);
+            String firstName = user.get().getFirstName();
+            userDAO.deleteById(mid);
             log.info("User "+mid.toString()+" Deleted -> "+firstName);
-            return  ResponseEntity.ok("User Deleted successfully");
+            return ResponseEntity.ok("User Deleted successfully");
         }
         else  return  ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
     }
@@ -77,17 +123,7 @@ public class UserController {
     @PutMapping("/user")
     @CachePut(value = "user",key = "#user.getMid()")
     public User updateUser(@RequestBody User user){
-//        if(userDAO.existsById((Integer) user.getMid())){
-//            User oldUser = userService.fetchUserById(user.getMid());
-//            String oldUserName = oldUser.getFirstName();
-//            userDAO.deleteById(oldUser.getMid());
-//            deleteUser(oldUser.getMid());
-//            saveUser(user);
-//            ResponseEntity.ok(user);
-//            log.info("Old user "+oldUserName+" Deleted. New user "+user.getFirstName());
-//            return userDAO.save(user);
-//        }
-        saveUser(user);
         return userDAO.save(user);
     }
+
 }

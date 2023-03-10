@@ -9,6 +9,7 @@ import org.springframework.cache.annotation.EnableCaching;
 public class SpringBootRedisMySqlApplication {
 
 	public static void main(String[] args) {
+
 		SpringApplication.run(SpringBootRedisMySqlApplication.class, args);
 	}
 
